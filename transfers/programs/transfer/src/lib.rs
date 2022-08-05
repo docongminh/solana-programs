@@ -45,13 +45,11 @@ pub struct TransferToken<'info> {
     pub sender: Signer<'info>,
     #[account(mut, associated_token::mint = mint, associated_token::authority = sender)]
     pub sender_associate: Account<'info, TokenAccount>,
-    /// CHECK:
     #[account(mut, constraint = receiver.data_is_empty())]
     pub receiver: AccountInfo<'info>,
 
     #[account(mut, associated_token::mint = mint, associated_token::authority = receiver)]
     pub receiver_associate: Account<'info, TokenAccount>,
-    #[account()]
     pub config_account: Account<'info, Config>,
 
     #[account(address = config_account.mint_address @ ErrorDefine::MintUnSupport)]
