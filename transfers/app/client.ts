@@ -36,6 +36,21 @@ import {
   const mintAddress = new PublicKey(
     "9mw9qp7gdHzNRn9kRych4NMw6zXYySnVUrZF9H8bziRp"
   );
+
+
+  const mint2 = new PublicKey("3xmazVDSPt1oaiboWo9QYjpwvKs8LjpdjFaCcHh6Chco");
+
+  const configAccount = anchor.web3.Keypair.generate();
+  const sig = await program.rpc.init(mint2, {
+    accounts: {
+      user: provider.wallet.publicKey,
+      systemProgram: SystemProgram.programId,
+      configAccount: configAccount.publicKey,
+    },
+    signers: [configAccount],
+  });
+  console.log("init: ", sig);
+
   const associatedTokenAccount = await getAssociatedTokenAddress(
     mintAddress,
     provider.wallet.publicKey
@@ -57,6 +72,7 @@ import {
   );
   await provider.sendAndConfirm(mint_tx, []);
 
+
   const tx1 = await program.rpc.transfer(new BN(10000000), {
     accounts: {
       sender: provider.wallet.publicKey,
@@ -64,6 +80,7 @@ import {
       receiver: toWallet.publicKey,
       receiverAssociate: toATA,
       mint: mintAddress,
+      configAccount: configAccount.publicKey,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
