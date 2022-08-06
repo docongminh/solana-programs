@@ -42,36 +42,40 @@ import {
     mintAddress,
     provider.wallet.publicKey
   );
-  const toWallet = anchor.web3.Keypair.generate();
-  const toATA = await getAssociatedTokenAddress(
+  const acc = anchor.web3.Keypair.generate();
+  const escrowWalletAssociateAccount = await getAssociatedTokenAddress(
     mintAddress,
-    toWallet.publicKey
+    acc.publicKey
   );
 
   const mint_tx = new anchor.web3.Transaction().add(
     // Create the ATA account that is associated with our To wallet
     createAssociatedTokenAccountInstruction(
       provider.wallet.publicKey,
-      toATA,
-      toWallet.publicKey,
+      escrowWalletAssociateAccount,
+      acc.publicKey,
       mintAddress
     )
   );
   const m = await provider.sendAndConfirm(mint_tx, []);
 
   console.log(associatedTokenAccount.toString())
-  console.log(toATA.toString())
+  console.log(escrowWalletAssociateAccount.toString())
   // Executes our transfer smart contract
   const tx = await program.rpc
-    .transferToken(
+    .deposit(
       new BN(1000),
+      new BN(64),
+      new BN(64),
       {accounts: {
+        stateAccount: acc.publicKey,
+        escrowWalletAssociateAccount: escrowWalletAssociateAccount,
+        user: provider.wallet.publicKey,
+        mint: mintAddress,
+        userAssociatedAccount: associatedTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
-        senderAssociate: associatedTokenAccount,
-        receiverAssociate: toATA,
-        sender: provider.wallet.publicKey,
-        receiver: toWallet.publicKey,
-      },
+        systemProgram: SystemProgram.programId
+      }
     })
 
   console.log(tx);
