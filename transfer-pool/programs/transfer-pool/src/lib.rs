@@ -55,7 +55,7 @@ pub mod transfer {
         Ok(())
     }
 
-    pub fn withdraw(ctx: Context<WithDrawInstruction>) -> Result<()> {
+    pub fn withdraw(ctx: Context<WithDrawInstruction>, id: u64) -> Result<()> {
         let current_stage = Stage::from(ctx.accounts.state_account.stage)?;
         let is_valid_stage = current_stage == Stage::Deposit || current_stage == Stage::WithDraw;
         if !is_valid_stage {
@@ -64,10 +64,12 @@ pub mod transfer {
         let state_bump = ctx.accounts.state_account.bumps.state_bump;
         let bump_vector = state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
+        let id_bytes = id.to_le_bytes();
         let inner = vec![
             b"state".as_ref(),
             ctx.accounts.user.key.as_ref(),
             mint_token.as_ref(),
+            id_bytes.as_ref(),
             bump_vector.as_ref(),
         ];
         let outer = vec![inner.as_slice()];
@@ -171,12 +173,13 @@ pub struct DepositInstruction<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(state_id: u64)]
 pub struct WithDrawInstruction<'info> {
     #[account(mut)]
     user: Signer<'info>,
     #[account(
         mut,
-        seeds=[b"state".as_ref(), user.key().as_ref(), mint.key().as_ref()],
+        seeds=[b"state", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
         bump,
         has_one = user,
         has_one = mint,
@@ -184,7 +187,7 @@ pub struct WithDrawInstruction<'info> {
     state_account: Account<'info, State>,
     #[account(
         mut,
-        seeds=[b"wallet".as_ref(), user.key().as_ref(), mint.key().as_ref()],
+        seeds=[b"wallet", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
         bump,
     )]
     escrow_wallet_associate_account: Account<'info, TokenAccount>,
