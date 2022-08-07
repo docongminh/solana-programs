@@ -1,6 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { Connection, PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
+import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { BN } from "bn.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -22,7 +22,7 @@ import {
       98, 99, 48, 114, 112, 245, 112, 153, 140, 153, 71, 195, 54, 41, 153, 193,
       245, 182, 246, 21, 149, 37, 50, 74, 53, 98, 101, 154, 182, 29, 90, 125,
     ])
-  );
+  ) as anchor.web3.Keypair;
   const wallet = new anchor.Wallet(payer);
   const provider = new anchor.AnchorProvider(connection, wallet, {
     commitment: "processed",
@@ -62,14 +62,39 @@ import {
   console.log(associatedTokenAccount.toString())
   console.log(escrowWalletAssociateAccount.toString())
   // Executes our transfer smart contract
+  const uid = new BN(parseInt((Date.now() / 1000).toString()));
+  const uidBuffer = uid.toBuffer('le', 8);
+  let [statePubKey, stateBump] = await anchor.web3.PublicKey.findProgramAddress(
+    [Buffer.from("state"), payer.publicKey.toBuffer(), mintAddress.toBuffer(), uidBuffer], program.programId,
+  );
+  let [walletPubKey, walletBump] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("wallet"), payer.publicKey.toBuffer(), mintAddress.toBuffer(), uidBuffer], program.programId,
+  );
+  console.log({statePubKey, walletPubKey})
   const tx = await program.rpc
     .deposit(
+      uid,
       new BN(1000),
-      new BN(64),
-      new BN(64),
       {accounts: {
-        stateAccount: acc.publicKey,
-        escrowWalletAssociateAccount: escrowWalletAssociateAccount,
+        stateAccount: statePubKey,
+        escrowWalletAssociateAccount: walletPubKey,
+        user: provider.wallet.publicKey,
+        mint: mintAddress,
+        userAssociatedAccount: associatedTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY
+      }
+    })
+
+  console.log(tx);
+
+  const tx2 = await program.rpc
+    .withdraw(
+      uid,
+      {accounts: {
+        stateAccount: statePubKey,
+        escrowWalletAssociateAccount: walletPubKey,
         user: provider.wallet.publicKey,
         mint: mintAddress,
         userAssociatedAccount: associatedTokenAccount,
@@ -78,6 +103,6 @@ import {
       }
     })
 
-  console.log(tx);
+  console.log(tx2);
 
 })();
