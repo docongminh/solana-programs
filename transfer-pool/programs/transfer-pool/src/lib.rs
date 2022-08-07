@@ -20,8 +20,7 @@ pub mod transfer {
         state.mint = ctx.accounts.mint.key().clone();
         state.escrow_wallet = ctx.accounts.escrow_wallet_associate_account.key().clone();
         state.amount = amount;
-
-        state.bumps.state_bump = *ctx.bumps.get("state").unwrap();
+        state.bumps.state_bump = *ctx.bumps.get("state_account").unwrap();
         let bump_vector = state.bumps.state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
         let id_bytes = id.to_le_bytes();
@@ -56,7 +55,7 @@ pub mod transfer {
         Ok(())
     }
 
-    pub fn with_draw(ctx: Context<WithDrawInstruction>) -> Result<()> {
+    pub fn withdraw(ctx: Context<WithDrawInstruction>) -> Result<()> {
         let current_stage = Stage::from(ctx.accounts.state_account.stage)?;
         let is_valid_stage = current_stage == Stage::Deposit || current_stage == Stage::WithDraw;
         if !is_valid_stage {
@@ -136,18 +135,20 @@ pub struct State {
 #[derive(Accounts)]
 #[instruction(state_id: u64)]
 pub struct DepositInstruction<'info> {
+    // PDA account
     #[account(
         init,
         payer = user,
-        seeds=[b"state".as_ref(), user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
+        space = 131,
+        seeds=[b"state", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
         bump,
-        space = 131
+        
     )]
     state_account: Account<'info, State>,
     #[account(
         init,
         payer=user,
-        seeds=[b"wallet".as_ref(), user.key().as_ref(), mint.key().as_ref()],
+        seeds=[b"wallet", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
         bump,
         token::mint=mint,
         token::authority=state_account,
@@ -171,6 +172,8 @@ pub struct DepositInstruction<'info> {
 
 #[derive(Accounts)]
 pub struct WithDrawInstruction<'info> {
+    #[account(mut)]
+    user: Signer<'info>,
     #[account(
         mut,
         seeds=[b"state".as_ref(), user.key().as_ref(), mint.key().as_ref()],
@@ -185,8 +188,6 @@ pub struct WithDrawInstruction<'info> {
         bump,
     )]
     escrow_wallet_associate_account: Account<'info, TokenAccount>,
-    #[account(mut)]
-    user: Signer<'info>,
     mint: Account<'info, Mint>,
     // refund wallet
     #[account(
