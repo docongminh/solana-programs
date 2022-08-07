@@ -13,25 +13,24 @@ declare_id!("Wk1uGMfZR6YhTjLAaUD1e944VcrgKvZXsFVPonjy1yD");
 pub mod transfer {
     use super::*;
 
-    pub fn deposit(
-        ctx: Context<DepositInstruction>,
-        amount: u64,
-        stage_bump: u8,
-        wallet_bump: u8,
-    ) -> Result<()> {
+    pub fn deposit(ctx: Context<DepositInstruction>, id: u64, amount: u64) -> Result<()> {
         let state = &mut ctx.accounts.state_account;
+        state.id = id;
         state.user = ctx.accounts.user.key().clone();
         state.mint = ctx.accounts.mint.key().clone();
         state.escrow_wallet = ctx.accounts.escrow_wallet_associate_account.key().clone();
         state.amount = amount;
 
-        let bump_vector = stage_bump.to_le_bytes();
+        state.bumps.state_bump = *ctx.bumps.get("state").unwrap();
+        let bump_vector = state.bumps.state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
+        let id_bytes = id.to_le_bytes();
 
         let inner = vec![
             b"state".as_ref(),
             ctx.accounts.user.key.as_ref(),
             mint_token.as_ref(),
+            id_bytes.as_ref(),
             bump_vector.as_ref(),
         ];
         let outer = vec![inner.as_slice()];
@@ -57,17 +56,13 @@ pub mod transfer {
         Ok(())
     }
 
-    pub fn with_draw(
-        ctx: Context<WithDrawInstruction>,
-        state_bump: u8,
-        wallet_bump: u8,
-    ) -> Result<()> {
+    pub fn with_draw(ctx: Context<WithDrawInstruction>) -> Result<()> {
         let current_stage = Stage::from(ctx.accounts.state_account.stage)?;
         let is_valid_stage = current_stage == Stage::Deposit || current_stage == Stage::WithDraw;
         if !is_valid_stage {
             return Err(ErrorCode::InvalidStage.into());
         }
-
+        let state_bump = ctx.accounts.state_account.bumps.state_bump;
         let bump_vector = state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
         let inner = vec![
@@ -120,36 +115,44 @@ pub mod transfer {
     }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct Bumps {
+    pub state_bump: u8,
+    pub wallet_bump: u8,
+}
 #[account]
 pub struct State {
+    // `id` param make sure each state instance unique
+    id: u64,
     user: Pubkey,
     mint: Pubkey,
     // associated account
     escrow_wallet: Pubkey,
     amount: u64,
     stage: u8,
+    bumps: Bumps,
 }
 
 #[derive(Accounts)]
-#[instruction(bump: u8, wallet_bump: u8)]
+#[instruction(state_id: u64)]
 pub struct DepositInstruction<'info> {
     #[account(
         init,
         payer = user,
-        seeds=[b"state".as_ref(), user.key().as_ref(), mint.key().as_ref()],
+        seeds=[b"state".as_ref(), user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
         bump,
-        space = 132
+        space = 131
     )]
     state_account: Account<'info, State>,
     #[account(
-        mut,
+        init,
+        payer=user,
         seeds=[b"wallet".as_ref(), user.key().as_ref(), mint.key().as_ref()],
-        bump = wallet_bump,
+        bump,
         token::mint=mint,
         token::authority=state_account,
     )]
     escrow_wallet_associate_account: Account<'info, TokenAccount>,
-
     #[account(mut)]
     user: Signer<'info>,
     mint: Account<'info, Mint>,
@@ -163,15 +166,15 @@ pub struct DepositInstruction<'info> {
 
     system_program: Program<'info, System>,
     token_program: Program<'info, Token>,
+    rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
-#[instruction(state_bump: u8, wallet_bump: u8)]
 pub struct WithDrawInstruction<'info> {
     #[account(
         mut,
         seeds=[b"state".as_ref(), user.key().as_ref(), mint.key().as_ref()],
-        bump = state_bump,
+        bump,
         has_one = user,
         has_one = mint,
     )]
@@ -179,7 +182,7 @@ pub struct WithDrawInstruction<'info> {
     #[account(
         mut,
         seeds=[b"wallet".as_ref(), user.key().as_ref(), mint.key().as_ref()],
-        bump = wallet_bump,
+        bump,
     )]
     escrow_wallet_associate_account: Account<'info, TokenAccount>,
     #[account(mut)]
