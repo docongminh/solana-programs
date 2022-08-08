@@ -7,15 +7,14 @@ use anchor_spl::token::{CloseAccount, Mint, Token, Transfer};
 
 use crate::error::ErrorCode;
 use crate::state::Stage;
-declare_id!("C2CUQu9W2oPBKfH45TTCmLdPnjh43MKpYqRzTbMbFnfT");
+declare_id!("4yoXwFCYbZwSaLXfgtJ5S8gKiaiyaqxzb6ML8Nh3e4kc");
 
 #[program]
 pub mod escrow {
     use super::*;
 
-    pub fn deposit(ctx: Context<DepositInstruction>, id: u64, amount: u64) -> Result<()> {
+    pub fn deposit(ctx: Context<DepositInstruction>, amount: u64) -> Result<()> {
         let state = &mut ctx.accounts.state_account;
-        state.id = id;
         state.user = ctx.accounts.user.key().clone();
         state.mint = ctx.accounts.mint.key().clone();
         state.escrow_wallet = ctx.accounts.escrow_wallet_associate_account.key().clone();
@@ -23,13 +22,11 @@ pub mod escrow {
         state.bumps.state_bump = *ctx.bumps.get("state_account").unwrap();
         let bump_vector = state.bumps.state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
-        let id_bytes = id.to_le_bytes();
 
         let inner = vec![
             b"state".as_ref(),
             ctx.accounts.user.key.as_ref(),
             mint_token.as_ref(),
-            id_bytes.as_ref(),
             bump_vector.as_ref(),
         ];
         let outer = vec![inner.as_slice()];
@@ -50,12 +47,12 @@ pub mod escrow {
         );
 
         anchor_spl::token::transfer(cpi_ctx, state.amount)?;
-
+        
         state.stage = Stage::Deposit.to_code();
         Ok(())
     }
 
-    pub fn withdraw(ctx: Context<WithDrawInstruction>, id: u64, amount: u64) -> Result<()> {
+    pub fn withdraw(ctx: Context<WithDrawInstruction>, amount: u64) -> Result<()> {
         let current_stage = Stage::from(ctx.accounts.state_account.stage)?;
         require_gte!(ctx.accounts.state_account.amount, amount, ErrorCode::InsufficientFunds);
         let is_valid_stage = current_stage == Stage::Deposit || current_stage == Stage::WithDraw;
@@ -67,12 +64,10 @@ pub mod escrow {
         let state_bump = ctx.accounts.state_account.bumps.state_bump;
         let bump_vector = state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
-        let id_bytes = id.to_le_bytes();
         let inner = vec![
             b"state".as_ref(),
             ctx.accounts.user.key.as_ref(),
             mint_token.as_ref(),
-            id_bytes.as_ref(),
             bump_vector.as_ref(),
         ];
         let outer = vec![inner.as_slice()];
@@ -126,8 +121,6 @@ pub struct Bumps {
 }
 #[account]
 pub struct State {
-    // `id` param make sure each state instance unique
-    id: u64,
     user: Pubkey,
     mint: Pubkey,
     // associated account
@@ -138,14 +131,13 @@ pub struct State {
 }
 
 #[derive(Accounts)]
-#[instruction(state_id: u64)]
 pub struct DepositInstruction<'info> {
     // PDA account
     #[account(
         init,
         payer = user,
         space = 131,
-        seeds=[b"state", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
+        seeds=[b"state", user.key().as_ref(), mint.key().as_ref()],
         bump,
         
     )]
@@ -153,7 +145,7 @@ pub struct DepositInstruction<'info> {
     #[account(
         init,
         payer=user,
-        seeds=[b"wallet", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
+        seeds=[b"wallet", user.key().as_ref(), mint.key().as_ref()],
         bump,
         token::mint=mint,
         token::authority=state_account,
@@ -165,8 +157,8 @@ pub struct DepositInstruction<'info> {
 
     #[account(
         mut,
-        constraint=user_associated_account.owner == user.key(),
-        constraint=user_associated_account.mint == mint.key()
+        token::mint=mint,
+        token::authority=user
     )]
     user_associated_account: Account<'info, TokenAccount>,
 
@@ -176,13 +168,12 @@ pub struct DepositInstruction<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(state_id: u64)]
 pub struct WithDrawInstruction<'info> {
     #[account(mut)]
     user: Signer<'info>,
     #[account(
         mut,
-        seeds=[b"state", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
+        seeds=[b"state", user.key().as_ref(), mint.key().as_ref()],
         bump,
         has_one = user,
         has_one = mint,
@@ -190,7 +181,7 @@ pub struct WithDrawInstruction<'info> {
     state_account: Account<'info, State>,
     #[account(
         mut,
-        seeds=[b"wallet", user.key().as_ref(), mint.key().as_ref(), state_id.to_le_bytes().as_ref()],
+        seeds=[b"wallet", user.key().as_ref(), mint.key().as_ref()],
         bump,
     )]
     escrow_wallet_associate_account: Account<'info, TokenAccount>,

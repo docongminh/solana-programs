@@ -29,7 +29,7 @@ import {
   });
 
   const Program_ID = new PublicKey(
-    "C2CUQu9W2oPBKfH45TTCmLdPnjh43MKpYqRzTbMbFnfT"
+    "4yoXwFCYbZwSaLXfgtJ5S8gKiaiyaqxzb6ML8Nh3e4kc"
   );
   const program = new anchor.Program(idl, Program_ID, provider);
 
@@ -65,15 +65,14 @@ import {
   const uid = new BN(parseInt((Date.now() / 1000).toString()));
   const uidBuffer = uid.toBuffer('le', 8);
   let [statePubKey, stateBump] = await anchor.web3.PublicKey.findProgramAddress(
-    [Buffer.from("state"), payer.publicKey.toBuffer(), mintAddress.toBuffer(), uidBuffer], program.programId,
+    [Buffer.from("state"), payer.publicKey.toBuffer(), mintAddress.toBuffer()], program.programId,
   );
   let [walletPubKey, walletBump] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("wallet"), payer.publicKey.toBuffer(), mintAddress.toBuffer(), uidBuffer], program.programId,
+      [Buffer.from("wallet"), payer.publicKey.toBuffer(), mintAddress.toBuffer()], program.programId,
   );
   console.log({statePubKey, walletPubKey})
   const tx = await program.rpc
     .deposit(
-      uid,
       new BN(1000),
       {accounts: {
         stateAccount: statePubKey,
@@ -89,21 +88,20 @@ import {
 
   console.log(tx);
 
-  const tx2 = await program.rpc
-    .withdraw(
-      uid,
-      new BN(800),
-      {accounts: {
-        stateAccount: statePubKey,
-        escrowWalletAssociateAccount: walletPubKey,
-        user: provider.wallet.publicKey,
-        mint: mintAddress,
-        userAssociatedAccount: associatedTokenAccount,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId
-      }
-    })
+  // const tx2 = await program.rpc
+  //   .withdraw(
+  //     new BN(200),
+  //     {accounts: {
+  //       stateAccount: statePubKey,
+  //       escrowWalletAssociateAccount: walletPubKey,
+  //       user: provider.wallet.publicKey,
+  //       mint: mintAddress,
+  //       userAssociatedAccount: associatedTokenAccount,
+  //       tokenProgram: TOKEN_PROGRAM_ID,
+  //       systemProgram: SystemProgram.programId
+  //     }
+  //   })
 
-  console.log(tx2);
+  // console.log(tx2);
   console.log(await program.account.state.fetch(statePubKey))
 })();
