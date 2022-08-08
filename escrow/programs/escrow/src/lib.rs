@@ -21,7 +21,8 @@ pub mod escrow {
         state.user = ctx.accounts.user.key().clone();
         state.mint = ctx.accounts.mint.key().clone();
         state.escrow_wallet = ctx.accounts.escrow_wallet_associate_account.key().clone();
-        state.amount = 0;
+        state.token_amount = 0;
+        state.lamport_amount = 0;
         state.bumps.state_bump = *ctx.bumps.get("state_account").unwrap();
         msg!("The state account already created");
         Ok(())
@@ -29,7 +30,6 @@ pub mod escrow {
 
     pub fn deposit(ctx: Context<DepositInstruction>, amount: u64, is_native: bool) -> Result<()> {
         let state = &mut ctx.accounts.state_account;
-        state.amount += amount;
         let bump_vector = state.bumps.state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
         let inner = vec![
@@ -42,6 +42,7 @@ pub mod escrow {
         let outer = vec![inner.as_slice()];
 
         if is_native {
+            state.lamport_amount += amount;
             transfer_sol(
                 ctx.accounts.user.to_account_info(),
                 state.to_account_info(),
@@ -51,7 +52,8 @@ pub mod escrow {
             )?;
             return Ok(())
         }
-        
+        // handle transfer token
+        state.token_amount += amount;
         transfer_token(
             ctx.accounts.user_associated_account.to_account_info(), 
             ctx.accounts.escrow_wallet_associate_account.to_account_info(),
@@ -65,16 +67,13 @@ pub mod escrow {
         Ok(())
     }
 
-    pub fn withdraw(ctx: Context<WithDrawInstruction>, amount: u64) -> Result<()> {
+    pub fn withdraw(ctx: Context<WithDrawInstruction>, amount: u64, is_native: bool) -> Result<()> {
         let current_stage = Stage::from(ctx.accounts.state_account.stage)?;
-        require_gte!(ctx.accounts.state_account.amount, amount, ErrorCode::InsufficientFunds);
         let is_valid_stage = current_stage == Stage::Deposit || current_stage == Stage::WithDraw;
         if !is_valid_stage {
             return Err(ErrorCode::InvalidStage.into());
         }
-        ctx.accounts.state_account.amount -= amount;
-        let state_bump = ctx.accounts.state_account.bumps.state_bump;
-        let bump_vector = state_bump.to_le_bytes();
+        let bump_vector = ctx.accounts.state_account.bumps.state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
         let inner = vec![
             b"state".as_ref(),
@@ -84,6 +83,21 @@ pub mod escrow {
         ];
         let outer = vec![inner.as_slice()];
 
+        if is_native {
+            require_gte!(ctx.accounts.state_account.lamport_amount, amount, ErrorCode::InsufficientFunds);
+            ctx.accounts.state_account.lamport_amount -= amount;
+            transfer_sol(
+                ctx.accounts.state_account.to_account_info(),
+                ctx.accounts.user.to_account_info(),
+                amount,
+                outer.clone(),
+                ctx.accounts.system_program.to_account_info()
+            )?;
+            return Ok(())
+        }
+        // handle withdraw token
+        ctx.accounts.state_account.token_amount -= amount;
+        require_gte!(ctx.accounts.state_account.token_amount, amount, ErrorCode::InsufficientFunds);
         transfer_token(
             ctx.accounts.escrow_wallet_associate_account.to_account_info(), 
             ctx.accounts.user_associated_account.to_account_info(),
@@ -122,7 +136,8 @@ pub struct State {
     mint: Pubkey,
     // associated account
     escrow_wallet: Pubkey,
-    amount: u64,
+    token_amount: u64,
+    lamport_amount: u64,
     stage: u8,
     bumps: Bumps,
 }
