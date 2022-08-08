@@ -29,7 +29,7 @@ import {
   });
 
   const Program_ID = new PublicKey(
-    "4yoXwFCYbZwSaLXfgtJ5S8gKiaiyaqxzb6ML8Nh3e4kc"
+    "51aT3n5amGTQMT4P5V1xaAQYti83ajaqkcqjJrRPJKg9"
   );
   const program = new anchor.Program(idl, Program_ID, provider);
 
@@ -62,35 +62,40 @@ import {
   console.log(associatedTokenAccount.toString())
   console.log(escrowWalletAssociateAccount.toString())
   // Executes our transfer smart contract
-  const uid = new BN(parseInt((Date.now() / 1000).toString()));
-  const uidBuffer = uid.toBuffer('le', 8);
   let [statePubKey, stateBump] = await anchor.web3.PublicKey.findProgramAddress(
     [Buffer.from("state"), payer.publicKey.toBuffer(), mintAddress.toBuffer()], program.programId,
   );
   let [walletPubKey, walletBump] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("wallet"), payer.publicKey.toBuffer(), mintAddress.toBuffer()], program.programId,
   );
-  console.log({statePubKey, walletPubKey})
-  const tx = await program.rpc
-    .deposit(
-      new BN(1000),
+  console.log(statePubKey.toString(), walletPubKey.toString())
+  let data;
+  try {
+   data = await program.account.state.fetch(statePubKey) 
+  } catch(err){
+    //
+  }
+  if(!data) {
+    console.log("init account")
+    const init = await program.rpc
+    .init(
       {accounts: {
         stateAccount: statePubKey,
         escrowWalletAssociateAccount: walletPubKey,
         user: provider.wallet.publicKey,
         mint: mintAddress,
-        userAssociatedAccount: associatedTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         rent: SYSVAR_RENT_PUBKEY
       }
     })
-
-  console.log(tx);
-
-  // const tx2 = await program.rpc
-  //   .withdraw(
-  //     new BN(200),
+    console.log("init: ", init)
+  }
+  const state0 = await program.account.state.fetch(statePubKey)
+  console.log("balance before deposit: ", state0.amount.toString())
+  // const tx = await program.rpc
+  //   .deposit(
+  //     new BN(4000),
   //     {accounts: {
   //       stateAccount: statePubKey,
   //       escrowWalletAssociateAccount: walletPubKey,
@@ -98,10 +103,29 @@ import {
   //       mint: mintAddress,
   //       userAssociatedAccount: associatedTokenAccount,
   //       tokenProgram: TOKEN_PROGRAM_ID,
-  //       systemProgram: SystemProgram.programId
+  //       systemProgram: SystemProgram.programId,
   //     }
   //   })
 
-  // console.log(tx2);
-  console.log(await program.account.state.fetch(statePubKey))
+  // console.log("Deposit: ", tx);
+  // const state1 = await program.account.state.fetch(statePubKey)
+  // console.log("balance after deposit: ", state1.amount.toString())
+
+  const tx2 = await program.rpc
+    .withdraw(
+      new BN(20000),
+      {accounts: {
+        stateAccount: statePubKey,
+        escrowWalletAssociateAccount: walletPubKey,
+        user: provider.wallet.publicKey,
+        mint: mintAddress,
+        userAssociatedAccount: associatedTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      }
+    })
+
+  console.log(tx2);
+  const state = await program.account.state.fetch(statePubKey)
+  console.log("balance after withdraw: ", state.amount.toString())
 })();
