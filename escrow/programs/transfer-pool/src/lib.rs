@@ -10,7 +10,7 @@ use crate::state::Stage;
 declare_id!("Wk1uGMfZR6YhTjLAaUD1e944VcrgKvZXsFVPonjy1yD");
 
 #[program]
-pub mod transfer {
+pub mod escrow {
     use super::*;
 
     pub fn deposit(ctx: Context<DepositInstruction>, id: u64, amount: u64) -> Result<()> {

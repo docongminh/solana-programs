@@ -12,7 +12,7 @@ import {
 } from "@solana/spl-token";
 
 (async () => {
-  const idl = require("/Users/minhdo/Documents/learning/solana-programs/transfer-pool/target/idl/transfer.json");
+  const idl = require("/Users/minhdo/Documents/learning/solana-programs/escrow/target/idl/escrow.json");
   const connection = new Connection("http://127.0.0.1:8899", "processed");
 
   const payer = Keypair.fromSecretKey(
