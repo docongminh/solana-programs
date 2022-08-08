@@ -93,7 +93,7 @@ pub mod escrow {
             outer.as_slice(),
         );
         anchor_spl::token::transfer(cpi_ctx, amount)?;
-
+        ctx.accounts.state_account.stage = Stage::WithDraw.to_code();
         // close Account when dont use any where again
         // let is_close = {
         //     ctx.accounts.escrow_wallet_associate_account.reload()?;
@@ -153,8 +153,7 @@ pub struct InitState<'info> {
         payer = user,
         space = 131,
         seeds=[b"state", user.key().as_ref(), mint.key().as_ref()],
-        bump,
-        
+        bump,    
     )]
     state_account: Account<'info, State>,
     #[account(
