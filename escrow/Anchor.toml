@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-transfer_pool = "Wk1uGMfZR6YhTjLAaUD1e944VcrgKvZXsFVPonjy1yD"
+transfer_pool = "C2CUQu9W2oPBKfH45TTCmLdPnjh43MKpYqRzTbMbFnfT"
 
 [registry]
 url = "https://api.apr.dev"

@@ -29,7 +29,7 @@ import {
   });
 
   const Program_ID = new PublicKey(
-    "Wk1uGMfZR6YhTjLAaUD1e944VcrgKvZXsFVPonjy1yD"
+    "C2CUQu9W2oPBKfH45TTCmLdPnjh43MKpYqRzTbMbFnfT"
   );
   const program = new anchor.Program(idl, Program_ID, provider);
 
@@ -92,6 +92,7 @@ import {
   const tx2 = await program.rpc
     .withdraw(
       uid,
+      new BN(800),
       {accounts: {
         stateAccount: statePubKey,
         escrowWalletAssociateAccount: walletPubKey,
@@ -104,5 +105,5 @@ import {
     })
 
   console.log(tx2);
-
+  console.log(await program.account.state.fetch(statePubKey))
 })();

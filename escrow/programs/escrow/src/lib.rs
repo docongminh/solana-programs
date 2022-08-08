@@ -7,7 +7,7 @@ use anchor_spl::token::{CloseAccount, Mint, Token, Transfer};
 
 use crate::error::ErrorCode;
 use crate::state::Stage;
-declare_id!("Wk1uGMfZR6YhTjLAaUD1e944VcrgKvZXsFVPonjy1yD");
+declare_id!("C2CUQu9W2oPBKfH45TTCmLdPnjh43MKpYqRzTbMbFnfT");
 
 #[program]
 pub mod escrow {
@@ -55,12 +55,15 @@ pub mod escrow {
         Ok(())
     }
 
-    pub fn withdraw(ctx: Context<WithDrawInstruction>, id: u64) -> Result<()> {
+    pub fn withdraw(ctx: Context<WithDrawInstruction>, id: u64, amount: u64) -> Result<()> {
         let current_stage = Stage::from(ctx.accounts.state_account.stage)?;
+        require_gte!(ctx.accounts.state_account.amount, amount, ErrorCode::InsufficientFunds);
         let is_valid_stage = current_stage == Stage::Deposit || current_stage == Stage::WithDraw;
         if !is_valid_stage {
             return Err(ErrorCode::InvalidStage.into());
         }
+        let remain_amount = ctx.accounts.state_account.amount - amount;
+        ctx.accounts.state_account.amount = remain_amount;
         let state_bump = ctx.accounts.state_account.bumps.state_bump;
         let bump_vector = state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
@@ -87,15 +90,15 @@ pub mod escrow {
             transfer_instruction,
             outer.as_slice(),
         );
-        anchor_spl::token::transfer(cpi_ctx, ctx.accounts.escrow_wallet_associate_account.amount)?;
+        anchor_spl::token::transfer(cpi_ctx, amount)?;
 
         // close Account when dont use any where again
-        let should_close = {
+        let is_close = {
             ctx.accounts.escrow_wallet_associate_account.reload()?;
             ctx.accounts.escrow_wallet_associate_account.amount == 0
         };
 
-        if should_close {
+        if is_close {
             let ca = CloseAccount {
                 account: ctx
                     .accounts

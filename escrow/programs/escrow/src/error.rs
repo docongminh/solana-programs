@@ -6,4 +6,6 @@ pub enum ErrorCode {
   WalletToWithdrawFromInvalid,
   #[msg("Invalid state storage")]
   InvalidStage,
+  #[msg("insufficient funds")]
+  InsufficientFunds,
 }
