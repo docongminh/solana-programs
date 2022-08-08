@@ -1,5 +1,6 @@
 pub mod error;
 pub mod state;
+pub mod processor;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
@@ -7,6 +8,7 @@ use anchor_spl::token::{Mint, Token, Transfer};
 
 use crate::error::ErrorCode;
 use crate::state::Stage;
+use crate::processor::{transfer_sol, transfer_token, to_close_account};
 declare_id!("51aT3n5amGTQMT4P5V1xaAQYti83ajaqkcqjJrRPJKg9");
 
 #[program]
@@ -25,36 +27,39 @@ pub mod escrow {
         Ok(())
     }
 
-    pub fn deposit(ctx: Context<DepositInstruction>, amount: u64) -> Result<()> {
+    pub fn deposit(ctx: Context<DepositInstruction>, amount: u64, is_native: bool) -> Result<()> {
         let state = &mut ctx.accounts.state_account;
         state.amount += amount;
         let bump_vector = state.bumps.state_bump.to_le_bytes();
         let mint_token = ctx.accounts.mint.key().clone();
-
         let inner = vec![
             b"state".as_ref(),
             ctx.accounts.user.key.as_ref(),
             mint_token.as_ref(),
             bump_vector.as_ref(),
         ];
+
         let outer = vec![inner.as_slice()];
 
-        // init account
-        let transfer_instruction = Transfer {
-            from: ctx.accounts.user_associated_account.to_account_info(),
-            to: ctx
-                .accounts
-                .escrow_wallet_associate_account
-                .to_account_info(),
-            authority: ctx.accounts.user.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            transfer_instruction,
-            outer.as_slice(),
-        );
-
-        anchor_spl::token::transfer(cpi_ctx, state.amount)?;
+        if is_native {
+            transfer_sol(
+                ctx.accounts.user.to_account_info(),
+                state.to_account_info(),
+                amount,
+                outer.clone(),
+                ctx.accounts.system_program.to_account_info()
+            )?;
+            return Ok(())
+        }
+        
+        transfer_token(
+            ctx.accounts.user_associated_account.to_account_info(), 
+            ctx.accounts.escrow_wallet_associate_account.to_account_info(),
+            amount, 
+            ctx.accounts.user.to_account_info(),
+            outer.clone(),
+            ctx.accounts.token_program.to_account_info()
+        )?;
         
         state.stage = Stage::Deposit.to_code();
         Ok(())
@@ -79,20 +84,14 @@ pub mod escrow {
         ];
         let outer = vec![inner.as_slice()];
 
-        let transfer_instruction = Transfer {
-            from: ctx
-                .accounts
-                .escrow_wallet_associate_account
-                .to_account_info(),
-            to: ctx.accounts.user_associated_account.to_account_info(),
-            authority: ctx.accounts.state_account.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            transfer_instruction,
-            outer.as_slice(),
-        );
-        anchor_spl::token::transfer(cpi_ctx, amount)?;
+        transfer_token(
+            ctx.accounts.escrow_wallet_associate_account.to_account_info(), 
+            ctx.accounts.user_associated_account.to_account_info(),
+            amount, 
+            ctx.accounts.state_account.to_account_info(),
+            outer.clone(),
+            ctx.accounts.token_program.to_account_info()
+        )?;
         ctx.accounts.state_account.stage = Stage::WithDraw.to_code();
         // close Account when dont use any where again
         // let is_close = {
@@ -101,20 +100,11 @@ pub mod escrow {
         // };
 
         // if is_close {
-        //     let ca = CloseAccount {
-        //         account: ctx
-        //             .accounts
-        //             .escrow_wallet_associate_account
-        //             .to_account_info(),
-        //         destination: ctx.accounts.user.to_account_info(),
-        //         authority: ctx.accounts.state_account.to_account_info(),
-        //     };
-        //     let cpi_ctx = CpiContext::new_with_signer(
-        //         ctx.accounts.token_program.to_account_info(),
-        //         ca,
-        //         outer.as_slice(),
-        //     );
-        //     anchor_spl::token::close_account(cpi_ctx)?;
+            // to_close_account(ctx.accounts.escrow_wallet_associate_account.to_account_info(),
+            // ctx.accounts.user.to_account_info(),
+            // ctx.accounts.state_account.to_account_info(),
+            // outer.clone(),
+            // ctx.accounts.token_program.to_account_info())?;
         // }
 
         Ok(())

@@ -93,27 +93,10 @@ import {
   }
   const state0 = await program.account.state.fetch(statePubKey)
   console.log("balance before deposit: ", state0.amount.toString())
-  // const tx = await program.rpc
-  //   .deposit(
-  //     new BN(4000),
-  //     {accounts: {
-  //       stateAccount: statePubKey,
-  //       escrowWalletAssociateAccount: walletPubKey,
-  //       user: provider.wallet.publicKey,
-  //       mint: mintAddress,
-  //       userAssociatedAccount: associatedTokenAccount,
-  //       tokenProgram: TOKEN_PROGRAM_ID,
-  //       systemProgram: SystemProgram.programId,
-  //     }
-  //   })
-
-  // console.log("Deposit: ", tx);
-  // const state1 = await program.account.state.fetch(statePubKey)
-  // console.log("balance after deposit: ", state1.amount.toString())
-
-  const tx2 = await program.rpc
-    .withdraw(
-      new BN(20000),
+  const tx = await program.rpc
+    .deposit(
+      new BN(4*anchor.web3.LAMPORTS_PER_SOL),
+      true,
       {accounts: {
         stateAccount: statePubKey,
         escrowWalletAssociateAccount: walletPubKey,
@@ -121,11 +104,30 @@ import {
         mint: mintAddress,
         userAssociatedAccount: associatedTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId
+        systemProgram: SystemProgram.programId,
       }
     })
 
-  console.log(tx2);
+  console.log("Deposit: ", tx);
+  const state1 = await program.account.state.fetch(statePubKey)
+  console.log("balance after deposit: ", state1.amount.toString())
+
+  // const tx2 = await program.rpc
+  //   .withdraw(
+  //     new BN(2000),
+  //     {accounts: {
+  //       stateAccount: statePubKey,
+  //       escrowWalletAssociateAccount: walletPubKey,
+  //       user: provider.wallet.publicKey,
+  //       mint: mintAddress,
+  //       userAssociatedAccount: associatedTokenAccount,
+  //       tokenProgram: TOKEN_PROGRAM_ID,
+  //       systemProgram: SystemProgram.programId
+  //     }
+  //   })
+
+  // console.log(tx2);
   const state = await program.account.state.fetch(statePubKey)
+  console.log(state)
   console.log("balance after withdraw: ", state.amount.toString())
 })();
