@@ -8,9 +8,9 @@ use anchor_spl::token::{Mint, Token};
 
 use crate::error::ErrorCode;
 use crate::state::{Stage, State};
-use crate::processor::{transfer_sol, transfer_token};
+use crate::processor::{transfer_sol, transfer_token, to_close_account};
 
-declare_id!("EuNSUtJxPNwS7T9YGj1TVxotkxZm3w1YMVkfmQM3uoA5");
+declare_id!("8JDESvt2JBggQMc5qDCuc3mDCqMf6EzJq8iEwRTcQJdx");
 
 #[program]
 pub mod trade_nft {
@@ -91,6 +91,15 @@ pub mod trade_nft {
             outer.clone(),
             ctx.accounts.system_program.to_account_info()
         )?;
+
+        // close account
+        to_close_account(
+            ctx.accounts.escrow_wallet_associate_account.to_account_info(),
+            ctx.accounts.seller.to_account_info(),
+            ctx.accounts.state_account.to_account_info(),
+            outer,
+            ctx.accounts.token_program.to_account_info()
+        )?;
         Ok(())
     }
 
@@ -119,6 +128,24 @@ pub mod trade_nft {
             outer.clone(),
             ctx.accounts.token_program.to_account_info()
         )?;
+
+        // close all accounts (state escrow account & state escrow associated account)
+        // close escrow associate account
+        to_close_account(
+            ctx.accounts.escrow_wallet_associate_account.to_account_info(),
+            ctx.accounts.seller.to_account_info(),
+            ctx.accounts.state_account.to_account_info(),
+            outer,
+            ctx.accounts.token_program.to_account_info()
+        )?;
+        // close escrow state account
+        // to_close_account(
+        //     ctx.accounts.state_account.to_account_info(),
+        //     ctx.accounts.seller.to_account_info(),
+        //     ctx.accounts.state_account.to_account_info(),
+        //     outer,
+        //     ctx.accounts.token_program.
+        // )
         Ok(())
     }   
 }

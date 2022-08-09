@@ -47,14 +47,14 @@ pub fn transfer_token<'info>(
 }
 
 pub fn to_close_account<'info>(
-  escrow_wallet_associate_account: AccountInfo<'info>,
+  account_to_close: AccountInfo<'info>,
   user: AccountInfo<'info>,
   state_account: AccountInfo<'info>,
   outer: Vec<&[&[u8]]>,
   token_program: AccountInfo<'info>,
 ) -> Result<()> {
   let close_account = CloseAccount {
-    account: escrow_wallet_associate_account.to_account_info(),
+    account: account_to_close.to_account_info(),
     destination: user.to_account_info(),
     authority: state_account.to_account_info(),
   };
