@@ -10,7 +10,7 @@ use crate::error::ErrorCode;
 use crate::state::{Stage, State};
 use crate::processor::{transfer_sol, transfer_token, to_close_account};
 
-declare_id!("8JDESvt2JBggQMc5qDCuc3mDCqMf6EzJq8iEwRTcQJdx");
+declare_id!("gcL6JvQVH7K8hdjrXK9nPN8AfHyH3DfT17GKS7rhmZ3");
 
 #[program]
 pub mod trade_nft {
@@ -191,9 +191,10 @@ pub struct SellInstruction<'info> {
 #[derive(Accounts)]
 #[instruction(price: u64)]
 pub struct BuyInstruction<'info> {
-    #[account(mut, constraint = buyer.lamports() > price)]
+    #[account(mut, constraint = buyer.lamports() > price @ ErrorCode::InsufficientFunds)]
     buyer: Signer<'info>,
     /// CHECK
+    #[account(mut)]
     seller: AccountInfo<'info>,
     #[account(mut)]
     state_account: Account<'info, State>,
