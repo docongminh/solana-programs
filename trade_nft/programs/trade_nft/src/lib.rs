@@ -158,7 +158,7 @@ pub struct SellInstruction<'info> {
     #[account(
         init,
         payer = seller,
-        space = 131,
+        space = 115,
         seeds=[b"state", seller.key().as_ref(), nft_mint.key().as_ref()],
         bump,    
     )]
