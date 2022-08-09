@@ -66,7 +66,7 @@ pub mod trade_nft {
             bump_vector.as_ref(),
         ];
         let outer = vec![inner.as_slice()];
-        // transfer sol from seller -> escrow
+        // transfer sol from buyer -> escrow
         transfer_sol(
             ctx.accounts.buyer.to_account_info(),
             state.to_account_info(),
