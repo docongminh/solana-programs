@@ -1,21 +1,22 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{CloseAccount, Mint, Token, Transfer};
+use anchor_spl::token::{CloseAccount, Transfer};
 
 pub fn transfer_sol<'info>(
   sender: AccountInfo<'info>,
   receiver: AccountInfo<'info>,
   amount: u64,
-  outer: Vec<&[&[u8]]>,
+  bump: u8,
   system_program: AccountInfo<'info>,
 ) -> Result<()> {
   let transfer_sol_instruction = anchor_lang::system_program::Transfer {
     from: sender.to_account_info(),
     to: receiver.to_account_info(),
   };
+  let seeds = &[&[b"state", bytemuck::bytes_of(&bump)][..]];
   let cpi_ctx_sol = CpiContext::new_with_signer(
     system_program.to_account_info(),
     transfer_sol_instruction,
-    outer.as_slice(),
+    seeds,
   );
   anchor_lang::system_program::transfer(cpi_ctx_sol, amount)?;
 
@@ -25,20 +26,20 @@ pub fn transfer_sol<'info>(
 pub fn transfer_token<'info>(
   sender: AccountInfo<'info>,
   receiver: AccountInfo<'info>,
-  amount: u64,
   user: AccountInfo<'info>,
-  outer: Vec<&[&[u8]]>,
+  amount: u64,
+  seeds: &[&[&[u8]]],
   token_program: AccountInfo<'info>,
 ) -> Result<()> {
-  let transfer_instruction = Transfer {
+  let transfer_instruction_account = Transfer {
     from: sender.to_account_info(),
     to: receiver.to_account_info(),
     authority: user.to_account_info(),
   };
   let cpi_ctx = CpiContext::new_with_signer(
     token_program.to_account_info(),
-    transfer_instruction,
-    outer.as_slice(),
+    transfer_instruction_account,
+    seeds,
   );
 
   anchor_spl::token::transfer(cpi_ctx, amount)?;

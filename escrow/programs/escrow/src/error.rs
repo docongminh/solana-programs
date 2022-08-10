@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum ErrorCode {
-  #[msg("Wallet to withdraw from is not owned by owner")]
-  WalletToWithdrawFromInvalid,
+  #[msg("Invalid user of state account")]
+  InvalidUser,
   #[msg("Invalid state storage")]
   InvalidStage,
   #[msg("insufficient funds")]
