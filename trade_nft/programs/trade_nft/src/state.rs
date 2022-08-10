@@ -23,7 +23,7 @@ pub struct Bumps {
 }
 
 #[account]
-pub struct State {
+pub struct StateAccount {
   pub seller: Pubkey,
   pub mint_nft: Pubkey,
   pub escrow_associate_wallet: Pubkey,
@@ -33,7 +33,7 @@ pub struct State {
   pub bumps: Bumps,
   pub timestamp: u64,
 }
-impl State {
+impl StateAccount {
   pub const LEN: usize = 8 + 3 * 32 + 8 * 3 + 3 * 1;
 }
 

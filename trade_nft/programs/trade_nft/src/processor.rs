@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program;
-use anchor_spl::token::{CloseAccount, Transfer};
+use anchor_spl::token::Transfer;
 
 pub fn transfer_sol<'info>(
   sender: AccountInfo<'info>,
@@ -39,70 +38,65 @@ pub fn transfer_token<'info>(
   token_program: AccountInfo<'info>,
   seeds: Option<&[&[&[u8]]]>,
 ) -> Result<()> {
+  let transfer_instruction_account = Transfer {
+    from: sender.to_account_info(),
+    to: receiver.to_account_info(),
+    authority: user.to_account_info(),
+  };
+  let cpi_ctx;
   match seeds {
     Some(seeds) => {
-      let transfer_instruction_account = Transfer {
-        from: sender.to_account_info(),
-        to: receiver.to_account_info(),
-        authority: user.to_account_info(),
-      };
-      let cpi_ctx = CpiContext::new_with_signer(
+      cpi_ctx = CpiContext::new_with_signer(
         token_program.to_account_info(),
         transfer_instruction_account,
         seeds,
       );
-      anchor_spl::token::transfer(cpi_ctx, amount)?;
     }
     None => {
-      let transfer_instruction_account = Transfer {
-        from: sender.to_account_info(),
-        to: receiver.to_account_info(),
-        authority: user.to_account_info(),
-      };
-      let cpi_ctx = CpiContext::new(
+      cpi_ctx = CpiContext::new(
         token_program.to_account_info(),
         transfer_instruction_account,
       );
-      anchor_spl::token::transfer(cpi_ctx, amount)?;
     }
   }
+  anchor_spl::token::transfer(cpi_ctx, amount)?;
   Ok(())
 }
 
-pub fn close_all_accounts<'info>(
-  account_to_close: AccountInfo<'info>,
-  user: AccountInfo<'info>,
-  state_account: AccountInfo<'info>,
-  seed: &[&[&[u8]]],
-  token_program: AccountInfo<'info>,
-  system_program: AccountInfo<'info>,
-) -> Result<()> {
-  // close associate account
-  // let close_associate_account = CloseAccount {
-  //   account: account_to_close.to_account_info(),
-  //   destination: user.to_account_info(),
-  //   authority: state_account.to_account_info(),
-  // };
-  // let cpi_close_associate_ctx = CpiContext::new_with_signer(
-  //   token_program.to_account_info(),
-  //   close_associate_account,
-  //   seed,
-  // );
-  // anchor_spl::token::close_account(cpi_close_associate_ctx)?;
+// pub fn close_all_accounts<'info>(
+//   account_to_close: AccountInfo<'info>,
+//   user: AccountInfo<'info>,
+//   state_account: AccountInfo<'info>,
+//   seed: &[&[&[u8]]],
+//   token_program: AccountInfo<'info>,
+//   system_program: AccountInfo<'info>,
+// ) -> Result<()> {
+// close associate account
+// let close_associate_account = CloseAccount {
+//   account: account_to_close.to_account_info(),
+//   destination: user.to_account_info(),
+//   authority: state_account.to_account_info(),
+// };
+// let cpi_close_associate_ctx = CpiContext::new_with_signer(
+//   token_program.to_account_info(),
+//   close_associate_account,
+//   seed,
+// );
+// anchor_spl::token::close_account(cpi_close_associate_ctx)?;
 
-  // close state account
-  solana_program::program::invoke_signed(
-    &solana_program::system_instruction::transfer(
-      state_account.key,
-      user.key,
-      state_account.lamports(),
-    ),
-    &[
-      state_account.to_account_info(),
-      user.to_account_info(),
-      system_program.to_account_info(),
-    ],
-    seed,
-  )?;
-  Ok(())
-}
+// close state account
+// solana_program::program::invoke_signed(
+//   &solana_program::system_instruction::transfer(
+//     state_account.key,
+//     user.key,
+//     state_account.lamports(),
+//   ),
+//   &[
+//     state_account.to_account_info(),
+//     user.to_account_info(),
+//     system_program.to_account_info(),
+//   ],
+//   seed,
+// )?;
+// Ok(())
+// }

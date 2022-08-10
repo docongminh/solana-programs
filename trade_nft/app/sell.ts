@@ -43,7 +43,7 @@ import {
   });
 
   const Program_ID = new PublicKey(
-    "DGWSLJhanAG1mkLgbGtCh2pL4W7CNnbbzY3fmyuh7CZe"
+    "3nDusEFjqioKWzhP6uXxqMSwk2rNMjB2Th8drLAGthh1"
   );
   const program = new anchor.Program(idl, Program_ID, provider);
 
@@ -51,7 +51,7 @@ import {
   //   "9H2u1qMjUMtTcbWWtbQK1TCZvm87Jdxs5gyCxtu8HETz"
   // );
   const mintAddress = new PublicKey(
-    "Dyk8Ypb1b8S4qfpo8iuu5U5i4uEjByDaYh9qXDxPY1aj"
+    "7EjmsgVFHooXei9dixsme6H6mF5swgLQnb5KeYz4Sxmp"
   );
   const associatedTokenAccount = await getAssociatedTokenAddress(
     mintAddress,
@@ -103,15 +103,16 @@ import {
   } catch (err) {
     //
   }
-  console.log("data: ", data);
-  if (!data) {
+  console.log(data)
+  if (data) {
     console.log("create...");
-    const create = await program.rpc.createTradeOrder({
+    const create = await program.rpc.createTradeOrder(
+      {
       accounts: {
         seller: provider.wallet.publicKey,
         stateAccount: statePubKey,
-        escrowWalletAssociateAccount: walletPubKey,
-        nftMint: mintAddress,
+        escrowAssociateWallet: walletPubKey,
+        mintNft: mintAddress,
         sellerAssociatedAccount: associatedTokenAccount,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -121,9 +122,9 @@ import {
     console.log("create sell order: ", create);
   }
 
-  const state0 = await program.account.state.fetch(statePubKey);
-  console.log(state0);
-  console.log(state0.price.toString());
+  // const state_create = await program.account.state.fetch(statePubKey);
+  // console.log("state create: ", state_create);
+  // console.log(associatedTokenAccount.toString());
   const tx_sell = await program.rpc.sell(
     new BN(anchor.web3.LAMPORTS_PER_SOL),
     new BN(1),
@@ -131,8 +132,8 @@ import {
       accounts: {
         seller: provider.wallet.publicKey,
         stateAccount: statePubKey,
-        escrowWalletAssociateAccount: walletPubKey,
-        nftMint: mintAddress,
+        escrowAssociateWallet: walletPubKey,
+        mintNft: mintAddress,
         sellerAssociatedAccount: associatedTokenAccount,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -140,10 +141,29 @@ import {
     }
   );
   console.log(tx_sell);
-  // const state = await program.account.state.fetch(statePubKey);
-  // console.log(state);
+  // const state_sell = await program.account.state.fetch(statePubKey);
+  // console.log("state sell: ", state_sell);
 
-  console.log("start buy-----------");
+
+
+// const tx_cancel = await program.rpc.cancel(
+//     {
+//       accounts: {
+//         seller: provider.wallet.publicKey,
+//         stateAccount: statePubKey,
+//         escrowAssociateWallet: walletPubKey,
+//         mintNft: mintAddress,
+//         sellerAssociatedAccount: associatedTokenAccount,
+//         systemProgram: SystemProgram.programId,
+//         tokenProgram: TOKEN_PROGRAM_ID,
+//       },
+//     }
+//   );
+//   console.log(tx_cancel);
+  // const state_cancel = await program.account.state.fetch(statePubKey);
+  // console.log("state cancel: ", state_cancel);
+
+
   const buyerWalletAssociateAccount = await getAssociatedTokenAddress(
     mintAddress,
     buyer.publicKey
@@ -161,14 +181,14 @@ import {
 
   // const buyer_sig = await provider.sendAndConfirm(buyer_tx, []);
   // console.log(buyer_sig)
-  const tx_buy = await program.rpc.buy(new BN(1000000000), {
+  const tx_buy = await program.rpc.buy(new BN(1000000000), new BN(1), {
     accounts: {
       buyer: buyer.publicKey,
       seller: provider.wallet.publicKey,
       stateAccount: statePubKey,
-      nftMint: mintAddress,
+      mintNft: mintAddress,
       buyerAssociatedAccount: buyerWalletAssociateAccount,
-      escrowWalletAssociateAccount: walletPubKey,
+      escrowAssociateWallet: walletPubKey,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
     },
@@ -176,12 +196,4 @@ import {
   });
   console.log(tx_buy);
 
-
-  // const state = await program.account.state.fetch(statePubKey);
-  // console.log({
-  //   seller: state.seller.toString(),
-  //   mint: state.mintNft.toString(),
-  //   escrow: state.escrowAssociateWallet.toString(),
-  //   price: state.price.toString(),
-  // });
 })();
