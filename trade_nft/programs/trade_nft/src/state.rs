@@ -27,9 +27,14 @@ pub struct State {
   pub seller: Pubkey,
   pub mint_nft: Pubkey,
   pub escrow_associate_wallet: Pubkey,
+  pub amount: u64,
   pub price: u64,
   pub stage: u8,
   pub bumps: Bumps,
+  pub timestamp: u64,
+}
+impl State {
+  pub const LEN: usize = 8 + 3 * 32 + 8 * 3 + 3 * 1;
 }
 
 // define stage (current support: Sell, Buy & CancelSell)
