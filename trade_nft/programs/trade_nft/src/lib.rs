@@ -162,6 +162,7 @@ pub struct Create<'info> {
     rent: Sysvar<'info, Rent>,
 }
 #[derive(Accounts)]
+#[instruction(price: u64, amount: u64)]
 pub struct SellInstruction<'info> {
     #[account(mut, constraint = seller.lamports() > 0 && seller.data_is_empty())]
     seller: Signer<'info>,
@@ -178,7 +179,7 @@ pub struct SellInstruction<'info> {
         mut,
         token::mint=mint_nft,
         token::authority=seller,
-        constraint = seller_associated_account.amount > 0 @ErrorCode::InsufficientFunds
+        constraint = seller_associated_account.amount > 0 && seller_associated_account.amount < amount @ErrorCode::InsufficientFunds
     )]
     seller_associated_account: Account<'info, TokenAccount>,
     system_program: Program<'info, System>,
