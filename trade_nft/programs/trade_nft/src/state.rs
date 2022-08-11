@@ -19,22 +19,32 @@ pub enum Trade {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct Bumps {
   pub state_bump: u8,
-  pub wallet_bump: u8,
+  pub wallet_nft_bump: u8,
+  pub wallet_token_bump: u8,
 }
 
 #[account]
 pub struct StateAccount {
   pub seller: Pubkey,
   pub mint_nft: Pubkey,
-  pub escrow_associate_wallet: Pubkey,
+  // Token use to buy NFT
+  pub mint_token: Pubkey,
+  pub escrow_associate_nft_wallet: Pubkey,
   pub amount: u64,
-  pub price: u64,
+  // Price to buy NFT in SOL
+  pub price_sol: u64,
+  // Price to buy NFT in specify Token
+  pub price_token: u64,
+  pub timestamp: u64,
   pub stage: u8,
   pub bumps: Bumps,
-  pub timestamp: u64,
 }
+
 impl StateAccount {
-  pub const LEN: usize = 8 + 3 * 32 + 8 * 3 + 3 * 1;
+  pub const LEN: usize = 8 // internal discriminator
+    + 4 * 32 // PubKey
+    + 8 * 4 // u64
+    + 4 * 1; // u8
 }
 
 // define stage (current support: Sell, Buy & CancelSell)

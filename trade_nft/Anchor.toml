@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-trade_nft = "3nDusEFjqioKWzhP6uXxqMSwk2rNMjB2Th8drLAGthh1"
+trade_nft = "4kVr2h7SZkWVV7DBoYEkL4gV7bzcp2T9TbuFqmNBcnUc"
 
 [registry]
 url = "https://api.apr.dev"

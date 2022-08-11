@@ -16,6 +16,7 @@ import {
   createInitializeMintInstruction,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
+import { token } from "@project-serum/anchor/dist/cjs/utils";
 
 (async () => {
   const idl = require("/Users/minhdo/Documents/learning/solana-programs/trade_nft/target/idl/trade_nft.json");
@@ -43,7 +44,7 @@ import {
   });
 
   const Program_ID = new PublicKey(
-    "3nDusEFjqioKWzhP6uXxqMSwk2rNMjB2Th8drLAGthh1"
+    "4kVr2h7SZkWVV7DBoYEkL4gV7bzcp2T9TbuFqmNBcnUc"
   );
   const program = new anchor.Program(idl, Program_ID, provider);
 
@@ -51,10 +52,17 @@ import {
   //   "9H2u1qMjUMtTcbWWtbQK1TCZvm87Jdxs5gyCxtu8HETz"
   // );
   const mintAddress = new PublicKey(
-    "7EjmsgVFHooXei9dixsme6H6mF5swgLQnb5KeYz4Sxmp"
+    "63xg3iUnWWxQp3TYTF8MUbyDuMz4F8aYi8qJdiCxYeeo"
   );
-  const associatedTokenAccount = await getAssociatedTokenAddress(
+  const token_mintAddress = new PublicKey(
+    "HqR42d2WMPLWNXnR3RUj9RsTuJcd656KiPvAXibHgPPF"
+  );
+  const sellerAssociatedNFTAccount = await getAssociatedTokenAddress(
     mintAddress,
+    provider.wallet.publicKey
+  );
+  const sellerAssociatedTokenAccount = await getAssociatedTokenAddress(
+    token_mintAddress,
     provider.wallet.publicKey
   );
   const acc = anchor.web3.Keypair.generate();
@@ -62,29 +70,34 @@ import {
     mintAddress,
     acc.publicKey
   );
+  try {
+    const mint_tx = new anchor.web3.Transaction().add(
+      // Create the ATA account that is associated with our To wallet
+      createAssociatedTokenAccountInstruction(
+        provider.wallet.publicKey,
+        escrowWalletAssociateAccount,
+        acc.publicKey,
+        mintAddress
+      )
+    );
 
-  const mint_tx = new anchor.web3.Transaction().add(
-    // Create the ATA account that is associated with our To wallet
-    createAssociatedTokenAccountInstruction(
-      provider.wallet.publicKey,
-      escrowWalletAssociateAccount,
-      acc.publicKey,
-      mintAddress
-    )
-  );
-
-  const m = await provider.sendAndConfirm(mint_tx, []);
-  console.log(associatedTokenAccount.toString());
-  console.log(escrowWalletAssociateAccount.toString());
+    const m = await provider.sendAndConfirm(mint_tx, []);
+  } catch (error) {
+    ///
+  }
   // Executes our transfer smart contract
   let [statePubKey, stateBump] = await anchor.web3.PublicKey.findProgramAddress(
-    [Buffer.from("state"), payer.publicKey.toBuffer(), mintAddress.toBuffer()],
+    [
+      Buffer.from("escrow_state"),
+      payer.publicKey.toBuffer(),
+      mintAddress.toBuffer(),
+    ],
     program.programId
   );
   let [walletPubKey, walletBump] =
     await anchor.web3.PublicKey.findProgramAddress(
       [
-        Buffer.from("wallet"),
+        Buffer.from("escrow_nft_associate"),
         payer.publicKey.toBuffer(),
         mintAddress.toBuffer(),
       ],
@@ -103,17 +116,17 @@ import {
   } catch (err) {
     //
   }
-  console.log(data)
+  console.log(data);
   if (data) {
     console.log("create...");
-    const create = await program.rpc.createTradeOrder(
-      {
+    const create = await program.rpc.createTradeOrder({
       accounts: {
-        seller: provider.wallet.publicKey,
         stateAccount: statePubKey,
-        escrowAssociateWallet: walletPubKey,
+        escrowAssociateNftWallet: walletPubKey,
         mintNft: mintAddress,
-        sellerAssociatedAccount: associatedTokenAccount,
+        mintToken: token_mintAddress,
+        sellerAssociateNftAccount: sellerAssociatedNFTAccount,
+        seller: provider.wallet.publicKey,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
         rent: SYSVAR_RENT_PUBKEY,
@@ -125,16 +138,23 @@ import {
   // const state_create = await program.account.state.fetch(statePubKey);
   // console.log("state create: ", state_create);
   // console.log(associatedTokenAccount.toString());
+
+  ///////////////////
+  console.log("start sell");
+  console.log(anchor.web3.LAMPORTS_PER_SOL * 10);
+  console.log("sellerAssociatedNFTAccount", sellerAssociatedNFTAccount.toString())
   const tx_sell = await program.rpc.sell(
     new BN(anchor.web3.LAMPORTS_PER_SOL),
+    new BN(anchor.web3.LAMPORTS_PER_SOL * 10),
     new BN(1),
     {
       accounts: {
-        seller: provider.wallet.publicKey,
         stateAccount: statePubKey,
-        escrowAssociateWallet: walletPubKey,
+        escrowAssociateNftWallet: walletPubKey,
         mintNft: mintAddress,
-        sellerAssociatedAccount: associatedTokenAccount,
+        mintToken: token_mintAddress,
+        sellerAssociateNftAccount: sellerAssociatedNFTAccount,
+        seller: provider.wallet.publicKey,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
@@ -144,56 +164,95 @@ import {
   // const state_sell = await program.account.state.fetch(statePubKey);
   // console.log("state sell: ", state_sell);
 
+  // const tx_cancel = await program.rpc.cancel(
+  //     {
+  //       accounts: {
+  //         seller: provider.wallet.publicKey,
+  //         stateAccount: statePubKey,
+  //         escrowAssociateNftWallet: walletPubKey,
+  //         mintNft: mintAddress,
+  //         sellerAssociateNftAccount: sellerAssociatedNFTAccount,
+  //         systemProgram: SystemProgram.programId,
+  //         tokenProgram: TOKEN_PROGRAM_ID,
+  //       },
+  //     }
+  //   );
+  //   console.log(tx_cancel);
 
+  ////////////////////
 
-// const tx_cancel = await program.rpc.cancel(
-//     {
-//       accounts: {
-//         seller: provider.wallet.publicKey,
-//         stateAccount: statePubKey,
-//         escrowAssociateWallet: walletPubKey,
-//         mintNft: mintAddress,
-//         sellerAssociatedAccount: associatedTokenAccount,
-//         systemProgram: SystemProgram.programId,
-//         tokenProgram: TOKEN_PROGRAM_ID,
-//       },
-//     }
-//   );
-//   console.log(tx_cancel);
   // const state_cancel = await program.account.state.fetch(statePubKey);
   // console.log("state cancel: ", state_cancel);
 
-
-  const buyerWalletAssociateAccount = await getAssociatedTokenAddress(
+  const buyerAssociateNFTAccount = await getAssociatedTokenAddress(
     mintAddress,
     buyer.publicKey
   );
+  try {
+    const buyer_tx = new anchor.web3.Transaction().add(
+      // Create the ATA account that is associated with our To wallet
+      createAssociatedTokenAccountInstruction(
+        provider.wallet.publicKey,
+        buyerAssociateNFTAccount,
+        buyer.publicKey,
+        mintAddress
+      )
+    );
 
-  // const buyer_tx = new anchor.web3.Transaction().add(
-  //   // Create the ATA account that is associated with our To wallet
-  //   createAssociatedTokenAccountInstruction(
-  //     provider.wallet.publicKey,
-  //     buyerWalletAssociateAccount,
-  //     buyer.publicKey,
-  //     mintAddress
-  //   )
-  // );
+    const buyer_sig = await provider.sendAndConfirm(buyer_tx, []);
+    console.log(buyer_sig);
+  } catch (error) {
+    console.log("NFT: ", error)
+  }
 
-  // const buyer_sig = await provider.sendAndConfirm(buyer_tx, []);
-  // console.log(buyer_sig)
-  const tx_buy = await program.rpc.buy(new BN(1000000000), new BN(1), {
-    accounts: {
-      buyer: buyer.publicKey,
-      seller: provider.wallet.publicKey,
-      stateAccount: statePubKey,
-      mintNft: mintAddress,
-      buyerAssociatedAccount: buyerWalletAssociateAccount,
-      escrowAssociateWallet: walletPubKey,
-      systemProgram: SystemProgram.programId,
-      tokenProgram: TOKEN_PROGRAM_ID,
-    },
-    signers: [buyer]
-  });
+  const buyerAssociateTokenAccount = await getAssociatedTokenAddress(
+    token_mintAddress,
+    buyer.publicKey
+  );
+  try {
+    const buyer__tx = new anchor.web3.Transaction().add(
+      // Create the ATA account that is associated with our To wallet
+      createAssociatedTokenAccountInstruction(
+        provider.wallet.publicKey,
+        buyerAssociateTokenAccount,
+        buyer.publicKey,
+        token_mintAddress
+      )
+    );
+
+    const buyer__sig = await provider.sendAndConfirm(buyer__tx, []);
+    console.log(buyer__sig);
+  } catch (error) {
+    //
+    console.log("TOKEN: ", error)
+  }
+  console.log("start buy");
+  const tx_buy = await program.rpc.buy(
+    false,
+    new BN(1),
+    new BN(0),
+    new BN(anchor.web3.LAMPORTS_PER_SOL * 10),
+    {
+      accounts: {
+        buyer: buyer.publicKey,
+        seller: provider.wallet.publicKey,
+        stateAccount: statePubKey,
+        escrowAssociateNftWallet: walletPubKey,
+        mintNft: mintAddress,
+        mintToken: token_mintAddress,
+        buyerAssociateNftAccount: buyerAssociateNFTAccount,
+
+
+        buyerAssociateTokenAccount: buyerAssociateTokenAccount,
+        sellerAssociateTokenAccount: sellerAssociatedTokenAccount,
+
+
+
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [buyer],
+    }
+  );
   console.log(tx_buy);
-
 })();

@@ -10,9 +10,11 @@ use crate::error::ErrorCode;
 use crate::state::{Stage, StateAccount};
 use crate::processor::{transfer_sol, transfer_token};
 
-declare_id!("3nDusEFjqioKWzhP6uXxqMSwk2rNMjB2Th8drLAGthh1");
-const ESCROW_PDA_SEED: &[u8] = b"state";
-const ESCROW_ASSOCIATE_PDA_SEED: &[u8] = b"wallet";
+declare_id!("4kVr2h7SZkWVV7DBoYEkL4gV7bzcp2T9TbuFqmNBcnUc");
+
+const ESCROW_PDA_SEED: &[u8] = b"escrow_state";
+const ESCROW_NFT_ASSOCIATE_PDA_SEED: &[u8] = b"escrow_nft_associate";
+
 #[program]
 pub mod trade_nft {
     use super::*;
@@ -20,21 +22,22 @@ pub mod trade_nft {
     pub fn create_trade_order(ctx: Context<Create>) -> Result<()>{
         let state = &mut ctx.accounts.state_account;
         state.seller = ctx.accounts.seller.key();
-        state.escrow_associate_wallet = ctx.accounts.escrow_associate_wallet.key();
+        state.escrow_associate_nft_wallet = ctx.accounts.escrow_associate_nft_wallet.key();
         state.mint_nft = ctx.accounts.mint_nft.key();
+        state.mint_token = ctx.accounts.mint_token.key();
         state.bumps.state_bump = *ctx.bumps.get("state_account").unwrap();
-        state.bumps.wallet_bump = *ctx.bumps.get("escrow_associate_wallet").unwrap();
-        msg!("state: {:?}", state.bumps.state_bump);
-        msg!("state: {:?}", state.bumps.wallet_bump);
+        state.bumps.wallet_nft_bump = *ctx.bumps.get("escrow_associate_nft_wallet").unwrap();
+        msg!("Trade order created !");
         Ok(())
     }
-    pub fn sell(ctx: Context<SellInstruction>, price: u64, amount: u64) -> Result<()>{
+    pub fn sell(ctx: Context<SellInstruction>, price_sol: u64, price_token: u64, amount: u64) -> Result<()>{
         let state = &mut ctx.accounts.state_account;
-        state.price = price;
+        state.price_sol = price_sol;
+        state.price_token = price_token;
         state.amount = amount;
         transfer_token(
-            ctx.accounts.seller_associated_account.to_account_info(),
-            ctx.accounts.escrow_associate_wallet.to_account_info(),
+            ctx.accounts.seller_associate_nft_account.to_account_info(),
+            ctx.accounts.escrow_associate_nft_wallet.to_account_info(),
             ctx.accounts.seller.to_account_info(),
             amount,
             ctx.accounts.token_program.to_account_info(),
@@ -44,7 +47,7 @@ pub mod trade_nft {
         Ok(())
     }
 
-    pub fn buy(ctx: Context<BuyInstruction>, price: u64, amount: u64) -> Result<()>{
+    pub fn buy(ctx: Context<BuyInstruction>, paid_native: bool, amount: u64, price_sol: u64, price_token: u64) -> Result<()>{
         let current_stage = Stage::from(ctx.accounts.state_account.stage)?;
         let is_valid_stage = current_stage == Stage::Sell;
         if !is_valid_stage {
@@ -54,18 +57,33 @@ pub mod trade_nft {
         let user_seed = state_account.seller.key();
         let nft_mint_seed = ctx.accounts.mint_nft.key();
         let seeds = &[&[ESCROW_PDA_SEED, user_seed.as_ref(), nft_mint_seed.as_ref(), bytemuck::bytes_of(&state_account.bumps.state_bump)][..]];
-        // transfer sol from buyer -> seller
-        transfer_sol(
-            ctx.accounts.buyer.to_account_info(),
-            ctx.accounts.seller.to_account_info(),
-            price,
-            ctx.accounts.system_program.to_account_info(),
-            None,
-        )?;
-        // // transfer nft from escrow -> buyer
+        if paid_native {
+            let total_sol_price = amount * price_sol;
+            msg!("totalsol: {:?}", total_sol_price);
+            // transfer sol from buyer -> seller
+            transfer_sol(
+                ctx.accounts.buyer.to_account_info(),
+                ctx.accounts.seller.to_account_info(),
+                total_sol_price,
+                ctx.accounts.system_program.to_account_info(),
+                None,
+            )?;
+        } else {
+            let total_token_price = amount * price_token;
+            // transfer token from buyer -> seller
+            transfer_token(
+                ctx.accounts.buyer_associate_token_account.to_account_info(),
+                ctx.accounts.seller_associate_token_account.to_account_info(),
+                ctx.accounts.buyer.to_account_info(),
+                total_token_price,
+                ctx.accounts.token_program.to_account_info(),
+                None
+            )?;
+        }
+        // transfer nft from escrow -> buyer
         transfer_token(
-            ctx.accounts.escrow_associate_wallet.to_account_info(),
-            ctx.accounts.buyer_associated_account.to_account_info(),
+            ctx.accounts.escrow_associate_nft_wallet.to_account_info(),
+            ctx.accounts.buyer_associate_nft_account.to_account_info(),
             state_account.to_account_info(),
             amount,
             ctx.accounts.token_program.to_account_info(),
@@ -88,24 +106,39 @@ pub mod trade_nft {
 
         // withdraw back nft to seller wallet
         transfer_token(
-            ctx.accounts.escrow_associate_wallet.to_account_info(), 
-            ctx.accounts.seller_associated_account.to_account_info(), 
+            ctx.accounts.escrow_associate_nft_wallet.to_account_info(), 
+            ctx.accounts.seller_associate_nft_account.to_account_info(), 
             state.to_account_info(),
             amount,
             ctx.accounts.token_program.to_account_info(),
             Some(seeds)
         )?;
         state.amount = 0;
-        state.price = 0;
+        state.price_sol = 0;
+        state.price_token = 0;
         Ok(())
     }   
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct SellData {
+    pub price_sol: u64,
+    pub price_token: u64,
+    // number of nft want to sell (NFT = 1, SFT = amount)
+    pub amount: u64
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Eq, PartialEq, Clone, Copy, Debug)]
+pub struct BuyData {
+    pub paid_native: bool,
+    pub price_sol: u64,
+    pub price_token: u64,
+    // number of nft want to buy (NFT = 1, SFT = amount)
+    pub amount: u64
+}
 
 #[derive(Accounts)]
 pub struct Create<'info> {
-    #[account(mut, constraint = seller.lamports() > 0 && seller.data_is_empty())]
-    seller: Signer<'info>,
     // PDA account
     #[account(
         init,
@@ -115,35 +148,37 @@ pub struct Create<'info> {
         bump,    
     )]
     state_account: Account<'info, StateAccount>,
+    // escrow associate account for nft
     #[account(
         init,
         payer=seller,
-        seeds=[ESCROW_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
+        seeds=[ESCROW_NFT_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
         bump,
         token::mint=mint_nft,
         token::authority=state_account,
     )]
-    escrow_associate_wallet: Account<'info, TokenAccount>,
+    escrow_associate_nft_wallet: Account<'info, TokenAccount>,
     // mint nft sell
     #[account(constraint = mint_nft.decimals == 0 @ ErrorCode::InvalidNFT)]
     mint_nft: Account<'info, Mint>,
-
+    mint_token: Account<'info, Mint>,
+    // seller associate nft account
     #[account(
         mut,
         token::mint=mint_nft,
         token::authority=seller,
-        constraint = seller_associated_account.amount > 0 @ ErrorCode::InsufficientFunds
+        constraint = seller_associate_nft_account.amount > 0 @ ErrorCode::InsufficientFunds
     )]
-    seller_associated_account: Account<'info, TokenAccount>,
+    seller_associate_nft_account: Account<'info, TokenAccount>,
+    #[account(mut, constraint = seller.lamports() > 0 && seller.data_is_empty())]
+    seller: Signer<'info>,
     system_program: Program<'info, System>,
     token_program: Program<'info, Token>,
     rent: Sysvar<'info, Rent>,
 }
 #[derive(Accounts)]
-#[instruction(price: u64, amount: u64)]
+#[instruction(amount: u64)]
 pub struct SellInstruction<'info> {
-    #[account(mut, constraint = seller.lamports() > 0 && seller.data_is_empty())]
-    seller: Signer<'info>,
     // PDA account
     #[account(mut,
         seeds = [ESCROW_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
@@ -153,30 +188,30 @@ pub struct SellInstruction<'info> {
     )]
     state_account: Account<'info, StateAccount>,
     #[account(mut,
-        seeds = [ESCROW_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
-        bump = state_account.bumps.wallet_bump
+        seeds = [ESCROW_NFT_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
+        bump = state_account.bumps.wallet_nft_bump
     )]
-    escrow_associate_wallet: Account<'info, TokenAccount>,
+    escrow_associate_nft_wallet: Account<'info, TokenAccount>,
     // mint nft sell
     #[account(constraint = mint_nft.decimals == 0 @ ErrorCode::InvalidNFT)]
     mint_nft: Account<'info, Mint>,
-
+    mint_token: Account<'info, Mint>,
     #[account(
         mut,
         token::mint=mint_nft,
         token::authority=seller,
-        constraint = seller_associated_account.amount > 0 @ErrorCode::InsufficientFunds
+        constraint = seller_associate_nft_account.amount > 0 @ ErrorCode::InsufficientFunds
     )]
-    seller_associated_account: Account<'info, TokenAccount>,
+    seller_associate_nft_account: Account<'info, TokenAccount>,
+    #[account(mut, constraint = seller.lamports() > 0 && seller.data_is_empty())]
+    seller: Signer<'info>,
     system_program: Program<'info, System>,
     token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
-#[instruction(price: u64)]
+#[instruction(amount: u64, price_sol: u64, price_token: u64)]
 pub struct BuyInstruction<'info> {
-    #[account(mut, constraint = buyer.lamports() > price @ ErrorCode::InsufficientFunds)]
-    buyer: Signer<'info>,
     /// CHECK
     #[account(mut)]
     seller: AccountInfo<'info>,
@@ -186,22 +221,43 @@ pub struct BuyInstruction<'info> {
         has_one=seller,
         has_one=mint_nft
     )]
-    state_account: Account<'info, StateAccount>,
+    state_account: Box<Account<'info, StateAccount>>,
+    #[account(mut,
+        seeds = [ESCROW_NFT_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
+        bump = state_account.bumps.wallet_nft_bump,
+        token::mint = mint_nft,
+        token::authority = state_account
+    )]
+    escrow_associate_nft_wallet: Box<Account<'info, TokenAccount>>,
     mint_nft: Account<'info, Mint>,
+    mint_token: Account<'info, Mint>,
     #[account(
         mut,
         token::mint = mint_nft,
         token::authority = buyer
     )]
-    buyer_associated_account: Account<'info, TokenAccount>,
-    #[account(mut,
-        seeds = [ESCROW_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
-        bump = state_account.bumps.wallet_bump,
-        token::mint = mint_nft,
-        token::authority = state_account
+    buyer_associate_nft_account: Box<Account<'info, TokenAccount>>,
+
+
+    #[account(
+        mut,
+        token::mint = mint_token,
+        token::authority = buyer
     )]
-    escrow_associate_wallet: Account<'info, TokenAccount>,
-    // system
+    buyer_associate_token_account: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        token::mint = mint_token,
+        token::authority = seller
+    )]
+    seller_associate_token_account: Box<Account<'info, TokenAccount>>,
+   
+
+
+    #[account(mut, constraint = buyer.lamports() > amount * price_sol @ ErrorCode::InsufficientFunds)]
+    buyer: Signer<'info>,
+    // // system
     system_program: Program<'info, System>,
     token_program: Program<'info, Token>,
 }
@@ -217,12 +273,12 @@ pub struct CancelSellInstruction<'info> {
     )]
     state_account: Account<'info, StateAccount>,
     #[account(mut,
-        seeds = [ESCROW_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
-        bump = state_account.bumps.wallet_bump,
+        seeds = [ESCROW_NFT_ASSOCIATE_PDA_SEED, seller.key().as_ref(), mint_nft.key().as_ref()],
+        bump = state_account.bumps.wallet_nft_bump,
         token::mint = mint_nft,
         token::authority = state_account
     )]
-    escrow_associate_wallet: Account<'info, TokenAccount>,
+    escrow_associate_nft_wallet: Account<'info, TokenAccount>,
     #[account(constraint = mint_nft.decimals == 0 @ ErrorCode::InvalidNFT)]
     mint_nft: Account<'info, Mint>,
     // refund wallet
@@ -231,7 +287,7 @@ pub struct CancelSellInstruction<'info> {
         token::mint = mint_nft,
         token::authority = seller
     )]
-    seller_associated_account: Account<'info, TokenAccount>,
+    seller_associate_nft_account: Account<'info, TokenAccount>,
     // system
     system_program: Program<'info, System>,
     token_program: Program<'info, Token>,
