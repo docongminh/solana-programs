@@ -30,6 +30,14 @@ pub mod trade_nft {
         msg!("Trade order created !");
         Ok(())
     }
+
+    pub fn edit_price(ctx: Context<EditPriceInstruction>, new_price_sol: u64, new_price_token: u64) -> Result<()> {
+        let state_account = &mut ctx.accounts.state_account;
+        state_account.price_sol = new_price_sol;
+        state_account.price_token = new_price_token;
+        Ok(())
+    }
+
     pub fn sell(ctx: Context<SellInstruction>, price_sol: u64, price_token: u64, amount: u64) -> Result<()>{
         let state = &mut ctx.accounts.state_account;
         state.price_sol = price_sol;
@@ -59,7 +67,6 @@ pub mod trade_nft {
         let seeds = &[&[ESCROW_PDA_SEED, user_seed.as_ref(), nft_mint_seed.as_ref(), bytemuck::bytes_of(&state_account.bumps.state_bump)][..]];
         if paid_native {
             let total_sol_price = amount * price_sol;
-            msg!("totalsol: {:?}", total_sol_price);
             // transfer sol from buyer -> seller
             transfer_sol(
                 ctx.accounts.buyer.to_account_info(),
@@ -104,7 +111,6 @@ pub mod trade_nft {
         let user_seed = state.seller.key();
         let nft_mint_seed = ctx.accounts.mint_nft.key();
         let seeds = &[&[ESCROW_PDA_SEED, user_seed.as_ref(), nft_mint_seed.as_ref(), bytemuck::bytes_of(&state.bumps.state_bump)][..]];
-
         // withdraw back nft to seller wallet
         transfer_token(
             ctx.accounts.escrow_associate_nft_wallet.to_account_info(), 
@@ -119,23 +125,6 @@ pub mod trade_nft {
         state.price_token = 0;
         Ok(())
     }   
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct SellData {
-    pub price_sol: u64,
-    pub price_token: u64,
-    // number of nft want to sell (NFT = 1, SFT = amount)
-    pub amount: u64
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Eq, PartialEq, Clone, Copy, Debug)]
-pub struct BuyData {
-    pub paid_native: bool,
-    pub price_sol: u64,
-    pub price_token: u64,
-    // number of nft want to buy (NFT = 1, SFT = amount)
-    pub amount: u64
 }
 
 #[derive(Accounts)]
@@ -210,6 +199,21 @@ pub struct SellInstruction<'info> {
     token_program: Program<'info, Token>,
 }
 
+
+#[derive(Accounts)]
+#[instruction(new_price_sol: u64, new_price_token: u64)]
+pub struct EditPriceInstruction<'info> {
+    #[account(mut,
+        has_one=seller @ ErrorCode::InvalidSeller,
+        has_one=mint_nft @ ErrorCode::InvalidMint,
+        constraint = state_account.amount > 0 @ ErrorCode::NotSelling
+    )]
+    state_account: Account<'info, StateAccount>,
+    seller: Signer<'info>,
+    // system
+    system_program: Program<'info, System>,
+    token_program: Program<'info, Token>,
+}
 #[derive(Accounts)]
 #[instruction(amount: u64, price_sol: u64, price_token: u64)]
 pub struct BuyInstruction<'info> {
@@ -238,24 +242,18 @@ pub struct BuyInstruction<'info> {
         token::authority = buyer
     )]
     buyer_associate_nft_account: Box<Account<'info, TokenAccount>>,
-
-
     #[account(
         mut,
         token::mint = mint_token,
         token::authority = buyer
     )]
     buyer_associate_token_account: Box<Account<'info, TokenAccount>>,
-
     #[account(
         mut,
         token::mint = mint_token,
         token::authority = seller
     )]
     seller_associate_token_account: Box<Account<'info, TokenAccount>>,
-   
-
-
     #[account(mut, constraint = buyer.lamports() > amount * price_sol @ ErrorCode::InsufficientFunds)]
     buyer: Signer<'info>,
     // // system
