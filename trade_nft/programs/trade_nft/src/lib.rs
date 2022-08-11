@@ -89,6 +89,7 @@ pub mod trade_nft {
             ctx.accounts.token_program.to_account_info(),
             Some(seeds)
         )?;
+        state_account.amount -= amount;
         Ok(())
     }
 
