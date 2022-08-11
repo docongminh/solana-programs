@@ -205,7 +205,6 @@ pub struct SellInstruction<'info> {
 pub struct EditPriceInstruction<'info> {
     #[account(mut,
         has_one=seller @ ErrorCode::InvalidSeller,
-        has_one=mint_nft @ ErrorCode::InvalidMint,
         constraint = state_account.amount > 0 @ ErrorCode::NotSelling
     )]
     state_account: Account<'info, StateAccount>,
