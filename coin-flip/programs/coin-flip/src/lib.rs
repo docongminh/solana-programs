@@ -14,7 +14,7 @@ const ESCROW_PDA_SEED: &[u8] = b"escrow_flip_state";
 pub mod coin_flip {
     use super::*;
 
-    pub fn create_flip_order(ctx: Context<InitializeInstruction>, id: u64, flip_value: u64) -> Result<()> {
+    pub fn create_flip_order(ctx: Context<Initialize>, id: u64, flip_value: u64) -> Result<()> {
         let state_account = &mut ctx.accounts.state_account;
         state_account.creator = ctx.accounts.creator.key();
         state_account.id = id;
@@ -33,7 +33,7 @@ pub mod coin_flip {
         Ok(())
     }
 
-    pub fn accept_flip(ctx: Context<FlippInstruction>) -> Result<()>{
+    pub fn accept_flip(ctx: Context<Flip>) -> Result<()>{
         ctx.accounts.state_account.acceptor = ctx.accounts.acceptor.key();
         transfer_sol(
             ctx.accounts.acceptor.to_account_info(),
@@ -73,7 +73,7 @@ pub mod coin_flip {
 
 #[derive(Accounts)]
 #[instruction(id: u64, amount: u64)]
-pub struct InitializeInstruction<'info> {
+pub struct Initialize<'info> {
     #[account(
         init,
         payer = creator,
@@ -92,7 +92,7 @@ pub struct InitializeInstruction<'info> {
 
 #[derive(Accounts)]
 #[instruction(id: u64)]
-pub struct FlippInstruction<'info>{
+pub struct Flip<'info>{
     #[account(mut, has_one=creator, has_one=fee_account, seeds=[ESCROW_PDA_SEED, creator.key().as_ref(), id.to_le_bytes().as_ref()], bump = state_account.bumps.state_bump)]
     state_account: Account<'info, StateFlipAccount>,
     #[account(mut, constraint = acceptor.lamports() > state_account.flip_value @ ErrorCode::InsufficientFunds)]
