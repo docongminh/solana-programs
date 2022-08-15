@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-coin_flip = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+coin_flip = "4LtpC4z4WpJcApWXM8Hm5N7iUP1C5j51NVyyYj334L3w"
 
 [registry]
 url = "https://api.apr.dev"
